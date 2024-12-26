@@ -1,0 +1,54 @@
+# Importa os pacotes
+import numpy as np
+import pandas as pd
+from scipy.stats import norm
+
+# Cria a funcao
+def deflated_sharpe_ratio(sharpe, n_tentativas, var_tentativas, assimetria, kurtose, numero_Periodos):
+    """
+    Calcula o Deflated Sharpe Ratio com base nos parâmetros fornecidos.
+
+    entradas:
+        sharpe (float): Sharpe Ratio não anualizado.
+        n_tentativas (int): Número de tentativas.
+        var_tentativas (float): Variância entre todos os Sharpe Ratios estimados.
+        assimetria (float): Assimetria dos retornos do backtest.
+        kurtose (float): Curtose dos retornos do backtest.
+        numero_Periodos (int): Total de períodos no backtest.
+
+    Retorna:
+        pd.DataFrame: DataFrame com os resultados.
+    """
+    emc = 0.5772156649  # Constante de Euler-Mascheroni
+
+    # Cálculo de maxZ
+    maxZ_t1 = (1 - emc) * norm.ppf(1 - 1 / n_tentativas)
+    maxZ_t2 = emc * norm.ppf(1 - 1 / n_tentativas * np.exp(-1))
+    maxZ = maxZ_t1 + maxZ_t2
+
+    # Cálculo de sr0
+    sr0 = np.sqrt(var_tentativas) * maxZ
+
+    # Numerador
+    numerador = (sharpe - sr0) * np.sqrt(numero_Periodos - 1)
+
+    # Denominador
+    assimetriaTermo = 1 - assimetria * sharpe
+    kurtoseTermo = (kurtose - 1) / 4 * (sharpe ** 2)
+    denominador = np.sqrt(assimetriaTermo + kurtoseTermo)
+
+    # Deflated Sharpe Ratio ajustado
+    dsr_adj = numerador / denominador
+    resultado = norm.cdf(dsr_adj)
+    dsr = sharpe * resultado
+    pval = 1 - resultado
+
+    # Retornar resultados como DataFrame
+    return pd.DataFrame({
+        'obs.Sharpe': [sharpe],
+        'max.Sharpe': [maxZ],
+        'deflated.Sharpe': [dsr],
+        'DSR': [resultado],
+        'p.value': [pval],
+        'n_tentativas': [n_tentativas]
+    })
